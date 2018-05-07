@@ -14,19 +14,19 @@ are permitted provided that the following conditions are met:
     * Neither the name of the copyright holder nor the names of its contributors
       may be used to endorse or promote products derived from this software
       without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+      
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR 
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR 
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+ 
  \file   movo_jtas.py
 
  \brief  This module offer an interface to control the movo arms
@@ -34,17 +34,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  \Platform: Linux/ROS Indigo
 --------------------------------------------------------------------"""
 from movo_joint_interface.jaco_joint_controller import SIArmController
-from trajectory_smoother import TrajectorySmoother
+from trajectory_smoother import TrajectorySmoother 
 
 from control_msgs.msg import (
-    FollowJointTrajectoryAction,
-    FollowJointTrajectoryFeedback,
+    FollowJointTrajectoryAction, 
+    FollowJointTrajectoryFeedback, 
     FollowJointTrajectoryResult,
     GripperCommandAction,
     GripperCommandFeedback,
     GripperCommandResult,
 )
-
+                     
 from trajectory_msgs.msg import JointTrajectoryPoint
 from std_msgs.msg import UInt16,Bool
 from movo_msgs.msg import Status
@@ -62,25 +62,25 @@ def calc_grip_dist(b):
     l1 = 30.9476-87.0932*math.sin(b[0]-0.627445866)
     l2 = 30.9476-87.0932*math.sin(b[1]-0.627445866)
     dist = l1+l2
-
+    
     if (dist < (2*30.9476)):
         dist-=17.0
     else:
         dist+=1.08
-
+    
     return (dist * 0.001)
 
 def calc_grip_angle(x):
-
+    
     dist = x*1000.0
     tmp = (0.5*dist-30.9476)/-87.0932
     a = math.asin(tmp)+0.627445866
-
+    
     if (0.5*dist > 30.9476):
         a+=0.00599
     else:
         a-=0.1
-
+    
     return (a)
 
 
@@ -92,14 +92,14 @@ class MovoArmJTAS(object):
         self._action_name = rospy.get_name()
         self._prefix = prefix
         # Action Feedback/Result
-
+        
         if ("kg2" == gripper):
             self.gripper_stall_force = 20.0
             self.gripper_dead_zone = 0.01
         elif("kg3" == gripper):
             self.gripper_stall_force = 30.0
             self.gripper_dead_zone = 0.01
-
+            
         self._last_gripper_pos = 0.165
         self._gripper_stall_to = 0.7
         self._gripper_pos_stall = False
@@ -128,8 +128,6 @@ class MovoArmJTAS(object):
         self._ctl = SIArmController(self._prefix,gripper,interface,jaco_ip)
         self._ctl.Pause()
         self._estop_delay = 0
-        self.init_finger_sub = rospy.Subscriber('/movo/init_fingers', Bool, self._init_fingers)
-        self.init_finger_pub = rospy.Publisher('/movo/fingers_are_initialized', Bool, queue_size=1)
         self.home_arm_sub = rospy.Subscriber('/movo/home_arms', Bool, self._home_arms)
         self.home_arm_pub = rospy.Publisher('/movo/arms_are_homed', Bool, queue_size=1)
         self._arms_homing = False
@@ -141,7 +139,7 @@ class MovoArmJTAS(object):
             return
         self.estop = False
         self._fdbk = FollowJointTrajectoryFeedback()
-        self._result = FollowJointTrajectoryResult()
+        self._result = FollowJointTrajectoryResult()        
         #self._dyn = reconfig_server
         self._ns = '/movo/%s_arm_controller'%self._prefix
         self._fjt_ns = self._ns + '/follow_joint_trajectory'
@@ -149,11 +147,11 @@ class MovoArmJTAS(object):
             self._fjt_ns,
             FollowJointTrajectoryAction,
             execute_cb=self._on_trajectory_action,
-            auto_start=False)
+            auto_start=False)            
         self._alive = True
         self._movo_status_sub = rospy.Subscriber("/movo/feedback/status",Status,self._update_movo_status)
         self._server.start()
-
+        
         # Action Server
         self._gripper_server = actionlib.SimpleActionServer(
             '/movo/%s_gripper_controller/gripper_cmd'%self._prefix,
@@ -161,40 +159,40 @@ class MovoArmJTAS(object):
             execute_cb=self._on_gripper_action,
             auto_start=False)
         self._gripper_server.start()
-
+        
         self._gripper_action_name = '/movo/%s_gripper_controller/gripper_cmd'%self._prefix
 
         # Action Feedback/Result
         self._gripper_fdbk = GripperCommandFeedback()
         self._gripper_result = GripperCommandResult()
         self._gripper_timeout = 6.0
-
+        
     def _update_gripper_feedback(self, position):
         tmp = self._ctl.GetGripperFdbk()
-
+        
         grip_dist = calc_grip_dist(tmp[0])
-
+        
         self._gripper_fdbk.position = grip_dist
         self._gripper_fdbk.effort = sum(tmp[2])
-
+        
         self._gripper_fdbk.stalled = (self._gripper_fdbk.effort >
                               self.gripper_stall_force)
         self._gripper_fdbk.reached_goal = (math.fabs(grip_dist -
                                         position) <
                                    self.gripper_dead_zone)
-
+        
         delta = math.fabs(self._gripper_fdbk.position - self._last_gripper_pos)
         self._last_gripper_pos = self._gripper_fdbk.position
         if (delta > 0.005):
             self._last_movement_time = rospy.get_time()
-
+        
         if (rospy.get_time() - self._last_movement_time) > self._gripper_stall_to:
             self._gripper_pos_stall=True
         else:
             self._gripper_pos_stall=False
-
+            
         self._gripper_fdbk.stalled |= self._gripper_pos_stall
-
+            
 
         self._gripper_result = self._gripper_fdbk
         self._gripper_server.publish_feedback(self._gripper_fdbk)
@@ -204,9 +202,9 @@ class MovoArmJTAS(object):
 
         ang = calc_grip_angle(position)
         self._ctl.CommandGripper(ang)
-
+        
     def _check_gripper_state(self):
-
+        
         return (self._gripper_fdbk.stalled or self._gripper_fdbk.reached_goal)
 
     def _on_gripper_action(self, goal):
@@ -253,7 +251,7 @@ class MovoArmJTAS(object):
                          (self._gripper_action_name,))
         self._update_gripper_feedback(position)
         self._gripper_server.set_aborted(self._gripper_result)
-
+    
     def _home_arms(self,cmd):
         self._arms_homing = cmd.data
 
@@ -263,15 +261,8 @@ class MovoArmJTAS(object):
             self.home_arm_pub.publish(Bool(True))
             rospy.sleep(2.0)
             self._arms_homing = False
-
-    def _init_fingers(self,cmd):
-        self._fingers_initializing = cmd.data
-
-        if (True == self._fingers_initializing):
-            self._ctl.api.InitFingers()
-            self.init_finger_pub.publish(Bool(True))
-            self._fingers_initializing = False
-
+        
+    
     def _update_movo_status(self,status):
         if (0 != status.dynamic_response) or (False == self._ctl.GetCtlStatus()) or self._arms_homing:
             self.estop = True
@@ -285,7 +276,7 @@ class MovoArmJTAS(object):
                 self.estop = True
                 self._ctl.SetEstop()
                 self._estop_delay -= 1
-
+    
     def robot_is_enabled(self):
         return not self.estop
 
@@ -307,7 +298,7 @@ class MovoArmJTAS(object):
             self._goal_time = goal.goal_time_tolerance.to_sec()
         else:
             self._goal_time = 1.0
-
+            
         """
         Stopped velocity tolerance - max velocity at end of execution
         """
@@ -324,7 +315,7 @@ class MovoArmJTAS(object):
                 self._result.error_code = self._result.INVALID_JOINTS
                 self._server.set_aborted(self._result)
                 return
-
+                
             """
             Path execution tolerance
             """
@@ -333,7 +324,7 @@ class MovoArmJTAS(object):
                 for tolerance in goal.path_tolerance:
                     if jnt == tolerance.name:
                         self._path_thresh[jnt] = tolerance.position
-
+            
             """
             Goal error tolerance
             """
@@ -351,7 +342,7 @@ class MovoArmJTAS(object):
 
     def _get_current_errors(self, joint_names):
         error = self._ctl.GetCurrentJointPositionError(joint_names)
-        return zip(joint_names, error)
+        return zip(joint_names, error)       
 
     def _update_feedback(self, cmd_point, joint_names, cur_time):
         self._fdbk.header.stamp = rospy.Duration.from_sec(rospy.get_time())
@@ -367,7 +358,7 @@ class MovoArmJTAS(object):
         self._fdbk.error.time_from_start = rospy.Duration.from_sec(cur_time)
         self._server.publish_feedback(self._fdbk)
 
-    def _command_stop(self):
+    def _command_stop(self): 
         self._ctl.SetPositionHold()
         self._ctl.ClearPositionHold()
 
@@ -378,7 +369,7 @@ class MovoArmJTAS(object):
             self._command_stop()
             return False
 
-        deltas = self._get_current_errors(joint_names)
+        deltas = self._get_current_errors(joint_names) 
         for delta in deltas:
             if ((math.fabs(delta[1]) >= self._path_thresh[delta[0]]
                 and self._path_thresh[delta[0]] >= 0.0)) or not self.robot_is_enabled():
@@ -388,7 +379,7 @@ class MovoArmJTAS(object):
                 self._server.set_aborted(self._result)
                 self._command_stop()
                 return False
-
+                
         pos = dict(zip(joint_names, point.positions))
         vel = dict(zip(joint_names, [0.0]*len(joint_names)))
         acc = dict(zip(joint_names, [0.0]*len(joint_names)))
@@ -396,11 +387,11 @@ class MovoArmJTAS(object):
             vel = dict(zip(joint_names, point.velocities))
         if dimensions_dict['accelerations']:
             acc = dict(zip(joint_names, point.accelerations))
-
+        
         if self._alive:
             self._ctl.CommandJoints(pos, vel, acc)
         return True
-
+        
     def _check_goal_state(self, joint_names, last):
         for error in self._get_current_errors(joint_names):
             if (self._goal_error[error[0]] > 0
@@ -416,23 +407,23 @@ class MovoArmJTAS(object):
     def _on_trajectory_action(self, goal):
         joint_names = goal.trajectory.joint_names
         self._get_trajectory_parameters(joint_names, goal)
-        success,results = self._traj_smoother.ProcessTrajectory(goal.trajectory,
+        success,results = self._traj_smoother.ProcessTrajectory(goal.trajectory, 
                                                                 self._get_current_position(joint_names),
                                                                 False)
         if not success:
             self._server.set_aborted()
             return
-
+            
         """
         Copy the results to variables that make sense namewise
         """
-        dimensions_dict   = results[0]
+        dimensions_dict   = results[0] 
         b_matrix          = results[1]
         trajectory_points = results[2]
         pnt_times         = results[3]
         num_points        = results[4]
-
-
+        
+        
         """
         Wait for the specified execution time, if not provided use now
         """
@@ -442,7 +433,7 @@ class MovoArmJTAS(object):
             start_time = rospy.get_time()
         while start_time > now:
             now = rospy.get_time()
-
+        
         """
         Loop until end of trajectory time.  Provide a single time step
         of the control rate past the end to ensure we get to the end.
@@ -471,10 +462,10 @@ class MovoArmJTAS(object):
                 cmd_time = 0.0
                 t = 0.0
 
-            point = self._traj_smoother.GetBezierPoint(b_matrix,
-                                                       idx,
-                                                       t,
-                                                       cmd_time,
+            point = self._traj_smoother.GetBezierPoint(b_matrix, 
+                                                       idx, 
+                                                       t, 
+                                                       cmd_time, 
                                                        dimensions_dict)
 
             """
@@ -489,7 +480,7 @@ class MovoArmJTAS(object):
             if not command_executed:
                 return
             control_rate.sleep()
-
+            
         """
         Keep trying to meet goal until goal_time constraint expired
         """
@@ -513,7 +504,7 @@ class MovoArmJTAS(object):
         Verify goal constraint
         """
         result = self._check_goal_state(joint_names, last)
-
+        
         if result is True:
             rospy.loginfo("%s: Joint Trajectory Action Succeeded for %s arm" %
                           (self._action_name, self._prefix))
