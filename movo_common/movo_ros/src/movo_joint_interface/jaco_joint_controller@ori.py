@@ -14,19 +14,19 @@ are permitted provided that the following conditions are met:
     * Neither the name of the copyright holder nor the names of its contributors
       may be used to endorse or promote products derived from this software
       without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+      
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR 
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR 
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, 
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+ 
  \file   jaco_joint_controller.py
 
  \brief  This module contains a collection of functions low level interface
@@ -47,7 +47,7 @@ from helpers import *
 from jaco_joint_pid import JacoPID
 from kinova_api_wrapper import *
 import operator
-
+        
 class SIArmController(object):
     def __init__(self, prefix="", gripper="", interface='eth0', jaco_ip="10.66.171.15"):
         """
@@ -60,9 +60,9 @@ class SIArmController(object):
         """
         rospy.loginfo('Starting JACO2 control')
         self.init_success = True
-
+        
         self._prefix = prefix
-        self.iface = interface
+        self.iface = interface   
 
         """
         List of joint names
@@ -73,7 +73,7 @@ class SIArmController(object):
                              self._prefix+'_wrist_1_joint',
                              self._prefix+'_wrist_2_joint',
                              self._prefix+'_wrist_3_joint']
-
+                             
         self._num_joints = len(self._joint_names)
 
         """
@@ -86,15 +86,15 @@ class SIArmController(object):
         else:
             rospy.logerr("prefix needs to be set to left or right, cannot start the controller")
             return
-
+        
         if not (self.api.init_success):
             self.Stop()
             return
-
+        
         self.api.SetCartesianControl()
         self._position_hold = False
         self.estop = False
-
+        
         """
         Initialize the joint feedback
         """
@@ -106,7 +106,7 @@ class SIArmController(object):
         self._joint_fb['velocity'] = vel[:self._num_joints]
         self._joint_fb['force'] = force[:self._num_joints]
 
-
+        
         if ("kg2" == gripper):
             self._gripper_joint_names = [self._prefix+'_gripper_finger1_joint',
                                          self._prefix+'_gripper_finger2_joint']
@@ -116,40 +116,40 @@ class SIArmController(object):
                                          self._prefix+'_gripper_finger2_joint',
                                          self._prefix+'_gripper_finger3_joint']
             self.num_fingers = 3
-
+        
         if (0 != self.num_fingers):
             self._gripper_fb = dict()
             self._gripper_fb['position'] = pos[self._num_joints:self._num_joints+self.num_fingers]
             self._gripper_fb['velocity'] = vel[self._num_joints:self._num_joints+self.num_fingers]
             self._gripper_fb['force'] = force[self._num_joints:self._num_joints+self.num_fingers]
-
+                
         """
         Register the publishers and subscribers
         """
         self.last_teleop_cmd_update = rospy.get_time()-0.5
         self._teleop_cmd_sub = rospy.Subscriber("/movo/%s_arm/cartesian_vel_cmd"%self._prefix,JacoCartesianVelocityCmd,self._update_teleop_cmd)
-
+        
         self._gripper_cmd = 0.0
-        self._ctl_mode = AUTONOMOUS_CONTROL
+        self._ctl_mode = AUTONOMOUS_CONTROL       
         self._jstpub = rospy.Publisher("/movo/%s_arm_controller/state"%self._prefix,JointTrajectoryControllerState,queue_size=10)
         self._jstmsg = JointTrajectoryControllerState()
         self._jstmsg.header.seq = 0
         self._jstmsg.header.frame_id = ''
-        self._jstmsg.header.stamp = rospy.get_rostime()
+        self._jstmsg.header.stamp = rospy.get_rostime() 
         self._jspub = rospy.Publisher("/movo/%s_arm/joint_states"%self._prefix,JointState,queue_size=10)
         self._jsmsg = JointState()
         self._jsmsg.header.seq = 0
         self._jsmsg.header.frame_id = ''
         self._jsmsg.header.stamp = rospy.get_rostime()
         self._jsmsg.name  = self._joint_names
-
+        
         self._actfdbk_pub = rospy.Publisher("/movo/%s_arm/actuator_feedback"%self._prefix,KinovaActuatorFdbk,queue_size=10)
         self._actfdbk_msg = KinovaActuatorFdbk()
         self._jsmsg.header.seq = 0
         self._jsmsg.header.frame_id = ''
         self._jsmsg.header.stamp = rospy.get_rostime()
-
-
+        
+                
         if (0 != self.num_fingers):
             self._teleop_gripper_cmd_sub = rospy.Subscriber("/movo/%s_gripper/vel_cmd"%self._prefix,Float32,self._update_teleop_gripper_cmd)
             self._gripper_jspub = rospy.Publisher("/movo/%s_gripper/joint_states"%self._prefix,JointState,queue_size=10)
@@ -158,7 +158,7 @@ class SIArmController(object):
             self._gripper_jsmsg.header.frame_id = ''
             self._gripper_jsmsg.header.stamp = rospy.get_rostime()
             self._gripper_jsmsg.name  = self._gripper_joint_names
-
+        
         """
         This starts the controller in cart vel mode so that teleop is active by default
         """
@@ -167,23 +167,23 @@ class SIArmController(object):
             for i in range(self.num_fingers):
                 self._gripper_pid[i] = JacoPID(5.0,0.0,0.8)
             self._gripper_vff = DifferentiateSignals(self.num_fingers, self._gripper_fb['position'])
-            self._gripper_rate_limit = RateLimitSignals([FINGER_ANGULAR_VEL_LIMIT]*self.num_fingers,self.num_fingers,self._gripper_fb['position'])
-
+            self._gripper_rate_limit = RateLimitSignals([FINGER_ANGULAR_VEL_LIMIT]*self.num_fingers,self.num_fingers,self._gripper_fb['position']) 
+        
         self._arm_rate_limit = RateLimitSignals(JOINT_VEL_LIMITS,self._num_joints,self._joint_fb['position'])
-        self._arm_vff_diff = DifferentiateSignals(self._num_joints, self._joint_fb['position'])
+        self._arm_vff_diff = DifferentiateSignals(self._num_joints, self._joint_fb['position'])        
 
         self._pid = [None]*self._num_joints
         self._pid[0] = JacoPID(5.0,0.0,0.8)
         self._pid[1] = JacoPID(5.0,0.0,0.8)
         self._pid[2] = JacoPID(5.0,0.0,0.8)
         self._pid[3] = JacoPID(5.0,0.0,0.8)
-        self._pid[4] = JacoPID(5.0,0.0,0.8)
-        self._pid[5] = JacoPID(5.0,0.0,0.8)
-        self.pause_controller = False
-
+        self._pid[4] = JacoPID(5.0,0.0,0.8) 
+        self._pid[5] = JacoPID(5.0,0.0,0.8) 
+        self.pause_controller = False 
+                
         self._init_ext_joint_position_control()
         self._init_ext_gripper_control()
-
+        
         """
         Set temporary tucked position after homing
         """
@@ -197,40 +197,40 @@ class SIArmController(object):
             self._arm_cmds['position'][2]-= deg_to_rad(50.0)
             self._arm_cmds['position'][4]+= deg_to_rad(90.0)
         """
-
+        
         """
         Update the feedback once to get things initialized
         """
         self._update_controller_data()
-
+        
         """
         Start the controller
-        """
+        """ 
         rospy.loginfo("Starting the %s controller"%self._prefix)
         self._done = False
         self._t1 = rospy.Timer(rospy.Duration(0.01),self._run_ctl)
-
-    def _init_ext_joint_position_control(self):
+        
+    def _init_ext_joint_position_control(self):    
         """
         Initialize the PID controllers, command interface, data processing and controller data
         for the arm
         """
         for pid in self._pid:
-            pid.initialize()
+            pid.initialize()    
         self._pid_error = [0.0]*self._num_joints
-        self._pid_output = [0.0]*self._num_joints
+        self._pid_output = [0.0]*self._num_joints               
         self._arm_cmds = dict()
         self._arm_cmds['position'] = self._joint_fb['position']
         self._arm_cmds['velocity'] = [0.0]*self._num_joints
         self._arm_cmds['acceleration'] = [0.0]*self._num_joints
         self._arm_rate_limit.Reset(self._arm_cmds['position'])
-        self._arm_vff_diff.Reset(self._arm_cmds['position'])
+        self._arm_vff_diff.Reset(self._arm_cmds['position'])        
 
     def _init_ext_gripper_control(self):
         """
         Initialize the PID controllers, command interface, data processing and controller data
         for the gripper
-        """
+        """        
         if (0 != self.num_fingers):
             for pid in self._gripper_pid:
                 pid.initialize()
@@ -238,7 +238,7 @@ class SIArmController(object):
             self._gripper_pid_output = [0.0]*self.num_fingers
             self._gripper_cmds = self._gripper_fb['position']
             self._gripper_vff.Reset(self._gripper_cmds)
-            self._gripper_rate_limit.Reset(self._gripper_cmds)
+            self._gripper_rate_limit.Reset(self._gripper_cmds) 
 
     def _update_teleop_cmd(self,cmds):
         with self._lock:
@@ -247,16 +247,10 @@ class SIArmController(object):
                 self.api.set_control_mode(TELEOP_CONTROL)
                 self._ctl_mode = TELEOP_CONTROL
             self.last_teleop_cmd_update = rospy.get_time()
-
+            
     def _update_teleop_gripper_cmd(self,cmd):
         self._gripper_cmd = cmd.data
-        with self._lock:
-            rospy.logwarn('_update_teleop_gripper_cmd: setting TELEOP_CONTROL, data= '+str(self._gripper_cmd))
-            self.api.set_control_mode(TELEOP_CONTROL)
-            self._ctl_mode = TELEOP_CONTROL
-            self.api.update_cartesian_vel_cmd([0,0,0,0,0,0,self._gripper_cmd])
-            self.last_teleop_cmd_update = rospy.get_time()
-
+        
     def SetEstop(self):
         self._init_ext_joint_position_control()
         self.estop = True
@@ -278,7 +272,7 @@ class SIArmController(object):
             except:
                 pass
             self.api.Shutdown()
-
+            
             rospy.loginfo("%s arm controller has stopped"%self._prefix)
             self._done = True
 
@@ -286,20 +280,20 @@ class SIArmController(object):
         if rospy.is_shutdown():
             self.Stop()
         return self._done
-
+        
     def UpdatePIDGains(self,pid_gains):
         new_pid_gains = [pid_gains[jnt] for jnt in self._joint_names]
-
+        
     def Pause(self):
         self.pause_controller = True
-
+        
     def Resume(self):
         self.pause_controller = False
-
-
+        
+        
     def GetCtlStatus(self):
         return self.api.api_online
-
+        
     def SetPositionHold(self):
         if self._position_hold:
             return
@@ -308,58 +302,58 @@ class SIArmController(object):
             self._arm_cmds['position'] = self._joint_fb['position']
             self._arm_cmds['velocity'] = [0.0]*self._num_joints
             self._arm_cmds['acceleration'] = [0.0]*self._num_joints
-
+            
     def ClearPositionHold(self):
         with self._lock:
             self._position_hold=False
-
+        
     def CommandJoints(self,pos,vel=None,acc=None):
         if self._position_hold:
             return False
-
+            
         with self._lock:
             self._arm_cmds['position'] = [pos[jnt] for jnt in self._joint_names]
             tmp = [i for i in self._arm_cmds['position']]
             for jnt in range(self._num_joints):
                 if (jnt!=1) and (jnt!=2):
-                    self._arm_cmds['position'][jnt] = get_smallest_difference_to_cont_angle(tmp[jnt],self._joint_fb['position'][jnt])
-
+                    self._arm_cmds['position'][jnt] = get_smallest_difference_to_cont_angle(tmp[jnt],self._joint_fb['position'][jnt])   
+            
             if vel:
                 self._arm_cmds['velocity'] = [vel[jnt] for jnt in self._joint_names]
             else:
-                self._arm_cmds['velocity'] = [0.0]*self._num_joints
+                self._arm_cmds['velocity'] = [0.0]*self._num_joints    
             if acc:
                 self._arm_cmds['acceleration'] = [acc[jnt] for jnt in self._joint_names]
             else:
                 self._arm_cmds['acceleration'] = [0.0]*self._num_joints
-
+                
         return True
-
+    
     def CommandGripper(self,finger_pos):
-        with self._lock:
-            self._gripper_cmds = [finger_pos]*self.num_fingers
+        with self._lock:        
+            self._gripper_cmds = [finger_pos]*self.num_fingers                    
 
     def GetGripperFdbk(self):
-        gripperfdbk = [0]*3
+        gripperfdbk = [0]*3        
         with self._lock:
 
             gripperfdbk[0] = self._gripper_fb['position']
             gripperfdbk[1] = self._gripper_fb['velocity']
             tmp = self._actfdbk_msg.current[self._num_joints:self._num_joints+self.num_fingers]
             gripperfdbk[2] = [(i/0.8) * 25 for i in tmp]
-
+            
         return gripperfdbk
-
+    
     def StopGripper(self):
         with self._lock:
-            self._gripper_cmds = self._gripper_fb['position']
+            self._gripper_cmds = self._gripper_fb['position']    
 
     def GetCurrentJointPosition(self, joint_names):
         with self._lock:
             pos = dict(zip(self._jsmsg.name,self._joint_fb['position']))
         pos = [pos[jnt] for jnt in joint_names]
         return pos
-
+        
     def GetCurrentJointVelocity(self,joint_names):
         with self._lock:
             vel = dict(zip(self._jsmsg.name,self._joint_fb['velocity']))
@@ -370,8 +364,8 @@ class SIArmController(object):
         with self._lock:
             pos_error = dict(zip(self._jsmsg.name,self._pid_error))
         pos_error = [pos_error[jnt] for jnt in joint_names]
-        return pos_error
-
+        return pos_error  
+         
     def _update_controller_data(self):
         pos = self.api.get_angular_position()
         vel = self.api.get_angular_velocity()
@@ -380,7 +374,7 @@ class SIArmController(object):
 
         if(len(sensor_data[0]) > 0):
             self._actfdbk_msg.current = sensor_data[0]
-
+            
         if(len(sensor_data[1]) > 0):
             self._actfdbk_msg.temperature = sensor_data[1]
 
@@ -405,14 +399,14 @@ class SIArmController(object):
         tmp[3] = wrap_angle(self._joint_fb['position'][3])
         tmp[4] = wrap_angle(self._joint_fb['position'][4])
         tmp[5] = wrap_angle(self._joint_fb['position'][5])
-
+        
         self._jsmsg.header.stamp = rospy.get_rostime()
         self._jsmsg.position = tmp
         self._jsmsg.velocity = self._joint_fb['velocity']
         self._jsmsg.effort = self._joint_fb['force']
         self._jspub.publish(self._jsmsg)
         self._jsmsg.header.seq+=1
-
+        
 
         if (0 != self.num_fingers):
             if (len(pos) > 0):
@@ -423,7 +417,7 @@ class SIArmController(object):
 
             if (len(force) > 0):
                 self._gripper_fb['force'] = force[self._num_joints:self._num_joints+self.num_fingers]
-
+            
             self._gripper_jsmsg.header.stamp = rospy.get_rostime()
             self._gripper_jsmsg.position = self._gripper_fb['position']
             self._gripper_jsmsg.velocity = self._gripper_fb['velocity']
@@ -434,17 +428,17 @@ class SIArmController(object):
     def _run_ctl(self,events):
         if self._is_shutdown():
             return
-
+        
         with self._lock:
-
+            
             """
             First update the controller data
             """
             self._update_controller_data()
-
+            
             if self.estop:
                 return
-
+        
             if (TELEOP_CONTROL == self._ctl_mode):
                 self._init_ext_joint_position_control()
                 self._init_ext_gripper_control()
@@ -452,12 +446,12 @@ class SIArmController(object):
                     self.api.set_control_mode(AUTONOMOUS_CONTROL)
                     self._ctl_mode = AUTONOMOUS_CONTROL
                     return
-
+                
                 if ((rospy.get_time() - self.last_teleop_cmd_update) >= 0.5):
                     self.api.update_cartesian_vel_cmd([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
                 self.api.send_cartesian_vel_cmd()
                 return
-
+            
             if (True == self.pause_controller):
                 self._init_ext_joint_position_control()
                 cmds = [0.0] * self._num_joints
@@ -471,12 +465,12 @@ class SIArmController(object):
                 scaled_ff_vel = map(operator.mul, vff, [1.0] * self._num_joints)
                 scaled_ff_acc = map(operator.mul, self._arm_cmds['acceleration'], [0.0] * self._num_joints)
                 ff_terms = map(operator.add, scaled_ff_vel, scaled_ff_acc)
-
+            
                 self._pid_error =  map(operator.sub, arm_cmds_lim, self._joint_fb['position'])
                 self._pid_output  = [self._pid[i].compute_output(self._pid_error[i]) for i in range(self._num_joints)]
-                self._pid_output = map(operator.add,self._pid_output, ff_terms)
+                self._pid_output = map(operator.add,self._pid_output, ff_terms) 
                 self._pid_output = [rad_to_deg(limit(self._pid_output[i],JOINT_VEL_LIMITS[i])) for i in range(self._num_joints)]
-
+            
                 """
                 Send the command via the API
                 """
@@ -487,9 +481,9 @@ class SIArmController(object):
                 vff = self._gripper_vff.Update(gripper_cmds_lim)
                 self._gripper_pid_error =  map(operator.sub, gripper_cmds_lim, self._gripper_fb['position'])
                 self._gripper_pid_output = [self._gripper_pid[i].compute_output(self._gripper_pid_error[i]) for i in range(self.num_fingers)]
-                self._gripper_pid_output =  map(operator.add, self._gripper_pid_output, vff)
+                self._gripper_pid_output =  map(operator.add, self._gripper_pid_output, vff)                
                 self._gripper_pid_output = [rad_to_deg(limit(self._gripper_pid_output[i],FINGER_ANGULAR_VEL_LIMIT)) for i in range(self.num_fingers)]
-
+            
             for i in range(3):
                 if (i < self.num_fingers):
                     cmds.append(self._gripper_pid_output[i])
@@ -497,10 +491,10 @@ class SIArmController(object):
                     cmds.append(0.0)
 
             self.api.send_angular_vel_cmds(cmds)
-
+            
             """
             Publish the controller state
-            """
+            """    
             self._jstmsg.header.frame_id = ''
             self._jstmsg.header.stamp = rospy.get_rostime()
             self._jstmsg.desired.positions=self._arm_cmds['position']
@@ -510,8 +504,8 @@ class SIArmController(object):
             self._jstmsg.actual.velocities=self._joint_fb['velocity']
             self._jstmsg.actual.accelerations=[0.0]*self._num_joints
             self._jstmsg.error.positions = self._pid_error
-            self._jstmsg.error.velocities= map(operator.sub, self._arm_cmds['velocity'], self._joint_fb['velocity'])
-            self._jstmsg.error.accelerations=[0.0]*self._num_joints
-            self._jstpub.publish(self._jstmsg)
-            self._jstmsg.header.seq +=1
-
+            self._jstmsg.error.velocities= map(operator.sub, self._arm_cmds['velocity'], self._joint_fb['velocity']) 
+            self._jstmsg.error.accelerations=[0.0]*self._num_joints                
+            self._jstpub.publish(self._jstmsg) 
+            self._jstmsg.header.seq +=1                       
+     
